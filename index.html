@@ -1,1 +1,710 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mini Medical Hub: tra cứu nhanh và theo dõi y văn</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AC%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #FAF6F7;
+    --surface: #FFFFFF;
+    --ink: #26233F;
+    --muted: #6A6683;
+    --line: #E7DEE3;
+    --hema: #43378A;
+    --hema-ink: #FFFFFF;
+    --hema-soft: #ECE9F7;
+    --eosin: #C4476A;
+    --eosin-soft: #F8E6EC;
+    --warn: #9A4A12;
+    --ok: #2A7454;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16142A; --surface: #1F1C38; --ink: #EEEBF8; --muted: #A9A5C4; --line: #35315C;
+      --hema: #A99DF2; --hema-ink: #16142A; --hema-soft: #2A2650;
+      --eosin: #F291AC; --eosin-soft: #3A2440; --warn: #F0A870; --ok: #7CCBA5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16142A; --surface: #1F1C38; --ink: #EEEBF8; --muted: #A9A5C4; --line: #35315C;
+    --hema: #A99DF2; --hema-ink: #16142A; --hema-soft: #2A2650;
+    --eosin: #F291AC; --eosin-soft: #3A2440; --warn: #F0A870; --ok: #7CCBA5;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: inherit; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 1rem/1.6 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 1.75rem 1.25rem 4rem; }
 
+  .site-title { font: 600 1.25rem/1.3 'Newsreader', Georgia, 'Times New Roman', serif; margin: 0; color: var(--hema); }
+  .site-sub { margin: .15rem 0 0; color: var(--muted); font-size: .9rem; }
+
+  .tabs { display: flex; gap: 1.5rem; margin: 1.5rem 0 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tab {
+    font: inherit; font-weight: 500; color: var(--muted); background: none; border: 0;
+    padding: .6rem 0; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--eosin); }
+  :focus-visible { outline: 2px solid var(--eosin); outline-offset: 2px; }
+
+  .hero { padding: 2rem 0 1.25rem; }
+  .hero h2 { font: 400 clamp(2.25rem, 7vw, 3.75rem)/1.05 'Newsreader', Georgia, serif; margin: 0; letter-spacing: -.01em; }
+  .hero .range { margin: .6rem 0 0; color: var(--muted); }
+  .seg { display: inline-flex; margin-top: 1.1rem; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg button { font: inherit; font-size: .9rem; padding: .5rem .95rem; border: 0; background: none; color: var(--ink); cursor: pointer; border-right: 1px solid var(--line); }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--hema); color: var(--hema-ink); }
+
+  .note { max-width: 44rem; color: var(--muted); font-size: .92rem; margin: 0 0 .5rem; }
+  .note.boxed { background: var(--hema-soft); color: var(--ink); padding: .8rem 1rem; border-radius: 8px; margin: 1.25rem 0; }
+
+  .list { margin-top: .75rem; border-top: 1px solid var(--line); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
+  .row-main { flex: 1 1 15rem; min-width: 0; }
+  .row-name { font-weight: 600; margin: 0; }
+  .row-name a { color: var(--hema); text-decoration: none; }
+  .row-name a:hover { text-decoration: underline; }
+  .row-meta { margin: .15rem 0 0; color: var(--muted); font-size: .85rem; }
+  .row-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+
+  .pill { display: inline-block; font-size: .78rem; font-weight: 500; padding: .05rem .55rem; border-radius: 999px; background: var(--hema-soft); color: var(--ink); margin-left: .5rem; vertical-align: middle; }
+  .pill.new { background: var(--eosin-soft); }
+
+  .btn {
+    font: inherit; font-size: .875rem; display: inline-flex; align-items: center; min-height: 2.25rem;
+    padding: .35rem .8rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); text-decoration: none; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--hema); }
+  .btn.primary { background: var(--hema); color: var(--hema-ink); border-color: var(--hema); }
+  .btn.quiet { border-color: transparent; background: none; color: var(--muted); }
+  .btn.quiet:hover { color: var(--ink); border-color: var(--line); }
+  .btn.danger { color: var(--eosin); }
+
+  .quick { flex: 1 1 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .25rem 1rem .75rem; }
+  .qitem { padding: .8rem 0; border-bottom: 1px solid var(--line); }
+  .qitem:last-of-type { border-bottom: 0; }
+  .qitem a { color: var(--hema); font-weight: 500; text-decoration: none; }
+  .qitem a:hover { text-decoration: underline; }
+  .tag { display: inline-block; font-size: .75rem; padding: .02rem .45rem; border-radius: 4px; background: var(--eosin-soft); margin-right: .35rem; }
+
+  .group-title { font: 600 1.25rem/1.3 'Newsreader', Georgia, serif; margin: 2.25rem 0 .25rem; }
+  .flag { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; }
+  .flag::before { content: ""; width: .55rem; height: .55rem; border-radius: 50%; background: var(--muted); }
+  .flag.ok { color: var(--ok); } .flag.ok::before { background: var(--ok); }
+  .flag.warn { color: var(--warn); } .flag.warn::before { background: var(--warn); }
+
+  .field { font: inherit; font-size: .9rem; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: .5rem .65rem; width: 100%; }
+  textarea.field { resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .82rem; }
+  .field-label { display: block; font-size: .85rem; color: var(--muted); margin: .7rem 0 .25rem; }
+  .version { width: min(14rem, 100%); }
+  .search { max-width: 26rem; margin-top: 1.25rem; }
+  .editor { flex: 1 1 100%; }
+  .editor-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
+  .add-row { margin-top: 1.25rem; display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+
+  .steps { list-style: none; counter-reset: s; padding: 0; margin: 1.25rem 0 0; max-width: 46rem; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 2rem 1fr; gap: .25rem .75rem; padding: 1.1rem 0; border-top: 1px solid var(--line); }
+  .steps li::before { content: counter(s); font: 400 1.5rem/1.2 'Newsreader', Georgia, serif; color: var(--eosin); }
+  .steps h3 { margin: 0; font-size: 1rem; }
+  .steps p { margin: .25rem 0 0; color: var(--muted); font-size: .92rem; }
+  .steps .step-body { grid-column: 2; }
+
+  details.q { margin-top: .4rem; }
+  details.q summary { cursor: pointer; color: var(--muted); font-size: .85rem; }
+  details.q code { display: block; margin-top: .4rem; padding: .6rem .7rem; background: var(--hema-soft); border-radius: 6px; font: .8rem/1.5 ui-monospace, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+
+  .foot { margin-top: 3rem; color: var(--muted); font-size: .82rem; max-width: 44rem; }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  @media (max-width: 34rem) { .wrap { padding: 1.25rem 1rem 3rem; } .seg button { padding: .5rem .7rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="site-title">Mini Medical Hub</h1>
+  <p class="site-sub">Tra cứu nhanh và theo dõi y văn ngoại ung bướu</p>
+
+  <div class="tabs" role="tablist" aria-label="Các mục">
+    <button class="tab" role="tab" id="tab-papers" aria-controls="panel-papers" aria-selected="true">Công bố mới</button>
+    <button class="tab" role="tab" id="tab-guides" aria-controls="panel-guides" aria-selected="false">Guideline và quy định</button>
+    <button class="tab" role="tab" id="tab-hub" aria-controls="panel-hub" aria-selected="false">Tra cứu nhanh</button>
+    <button class="tab" role="tab" id="tab-alerts" aria-controls="panel-alerts" aria-selected="false">Cảnh báo tự động</button>
+  </div>
+
+  <section id="panel-papers" role="tabpanel" aria-labelledby="tab-papers">
+    <div class="hero">
+      <h2 id="hero-title">30 ngày qua</h2>
+      <p class="range" id="hero-range"></p>
+      <div class="seg" id="seg" role="group" aria-label="Khoảng thời gian"></div>
+    </div>
+    <p class="note" id="live-note"></p>
+    <p class="note">Mốc ngày là ngày bài được đưa vào PubMed, nên bắt được cả bài online-first. Bấm "Xem nhanh" để đọc tiêu đề 10 bài mới nhất ngay tại đây, hoặc dùng các nút khác để mở danh sách đầy đủ trên PubMed.</p>
+    <div class="list" id="topics"></div>
+    <div class="add-row" id="topics-foot"></div>
+  </section>
+
+  <section id="panel-guides" role="tabpanel" aria-labelledby="tab-guides" hidden>
+    <p class="note boxed">Guideline và văn bản pháp quy không có mốc ngày chung để lọc. Ghi lại phiên bản bạn đang dùng, bấm "Đã kiểm tra" sau mỗi lần đối chiếu, và mục nào quá 30 ngày chưa xem sẽ được đánh dấu.</p>
+    <div id="guides"></div>
+    <div class="add-row" id="guides-foot"></div>
+  </section>
+
+  <section id="panel-hub" role="tabpanel" aria-labelledby="tab-hub" hidden>
+    <div class="search">
+      <label class="field-label" for="hub-filter">Tìm trong bộ sưu tập</label>
+      <input class="field" id="hub-filter" type="search" placeholder="Ví dụ: thuốc, nội soi, video">
+    </div>
+    <div id="hub"></div>
+  </section>
+
+  <section id="panel-alerts" role="tabpanel" aria-labelledby="tab-alerts" hidden>
+    <p class="note boxed">Trang này cho bạn thấy số bài mới mỗi khi mở, nhưng không tự gửi thông báo khi bạn không mở trang. Muốn được báo tự động, hãy đặt cảnh báo ở chính nguồn phát hành. Các bước dưới đây mất khoảng 15 phút cho lần đầu.</p>
+    <ol class="steps">
+      <li>
+        <div><h3>Cảnh báo email trên PubMed</h3><p>Cách chính xác nhất cho công bố mới. Cần tài khoản NCBI miễn phí.</p></div>
+        <div class="step-body">
+          <p>Chạy truy vấn của từng chủ đề (mục bên dưới), chọn "Create alert" dưới ô tìm kiếm, rồi chọn tần suất hằng ngày, hằng tuần hoặc hằng tháng. Cũng có "Create RSS" nếu bạn dùng trình đọc RSS.</p>
+          <div id="alert-topics"></div>
+        </div>
+      </li>
+      <li>
+        <div><h3>Mục lục tạp chí</h3></div>
+        <div class="step-body"><p>Đăng ký nhận email mục lục (TOC alert) trên trang của các tạp chí bạn đọc nhiều: Annals of Surgery, Annals of Surgical Oncology, Surgical Endoscopy, Diseases of the Colon &amp; Rectum, HPB, BJS.</p></div>
+      </li>
+      <li>
+        <div><h3>Bản tin của tổ chức guideline</h3></div>
+        <div class="step-body"><p>NCCN, ASCO, ESMO, ASCRS, SAGES đều có bản tin hoặc thông báo cập nhật khi đăng ký tài khoản. Đây là cách sớm nhất để biết một guideline vừa đổi phiên bản.</p></div>
+      </li>
+      <li>
+        <div><h3>Google Scholar alerts</h3></div>
+        <div class="step-body"><p>Bổ sung cho PubMed: bắt được bản thảo trước khi lên PubMed và các bài trích dẫn công trình của bạn. Dùng cùng các từ khóa ở bước 1.</p></div>
+      </li>
+      <li>
+        <div><h3>Văn bản Bộ Y tế và BHYT</h3></div>
+        <div class="step-body"><p>Những nguồn này chưa có cảnh báo email ổn định. Dùng tab "Guideline và quy định" để đánh dấu lần kiểm tra và xem định kỳ hằng tháng.</p></div>
+      </li>
+    </ol>
+  </section>
+
+  <p class="foot">Chủ đề, phiên bản và ngày kiểm tra được lưu trong trình duyệt này, không đồng bộ giữa các thiết bị. Số bài và danh sách xem nhanh lấy trực tiếp từ PubMed. Công cụ hỗ trợ tra cứu, không thay thế việc đọc toàn văn và đánh giá chứng cứ.</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- lưu trữ (an toàn khi bị chặn) ---------- */
+  var mem = {};
+  var store = {
+    get: function (k, d) {
+      try { var v = localStorage.getItem(k); if (v !== null) return JSON.parse(v); } catch (e) {}
+      return (k in mem) ? mem[k] : d;
+    },
+    set: function (k, v) {
+      mem[k] = v;
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
+    }
+  };
+  var clone = function (o) { return JSON.parse(JSON.stringify(o)); };
+
+  /* ---------- dữ liệu mặc định ---------- */
+  var DEFAULT_TOPICS = [
+    { id: 'dtt', name: 'Đại-trực tràng: phẫu thuật nội soi và robot',
+      query: '("Colorectal Neoplasms"[MeSH] OR colon cancer[tiab] OR rectal cancer[tiab]) AND (laparoscop*[tiab] OR robot*[tiab] OR "minimally invasive"[tiab])' },
+    { id: 'dd', name: 'Dạ dày: cắt dạ dày và nạo hạch',
+      query: '("Stomach Neoplasms"[MeSH] OR gastric cancer[tiab]) AND (gastrectomy[tiab] OR lymphadenectomy[tiab] OR surgery[tiab])' },
+    { id: 'hpb', name: 'Gan, mật, tụy',
+      query: '("Carcinoma, Hepatocellular"[MeSH] OR "Pancreatic Neoplasms"[MeSH] OR "Biliary Tract Neoplasms"[MeSH]) AND (hepatectomy[tiab] OR pancreatectomy[tiab] OR resection[tiab] OR surgery[tiab])' },
+    { id: 'vu', name: 'Vú: phẫu thuật và tạo hình ung thư',
+      query: '"Breast Neoplasms"[MeSH] AND (mastectomy[tiab] OR "breast-conserving"[tiab] OR oncoplastic[tiab] OR surgery[tiab])' },
+    { id: 'giap', name: 'Tuyến giáp',
+      query: '"Thyroid Neoplasms"[MeSH] AND (thyroidectomy[tiab] OR surgery[tiab])' },
+    { id: 'eras', name: 'ERAS và chăm sóc quanh mổ ung thư',
+      query: '("Enhanced Recovery After Surgery"[tiab] OR ERAS[tiab] OR "Perioperative Care"[MeSH]) AND (cancer[tiab] OR oncolog*[tiab])' },
+    { id: 'tanhotro', name: 'Điều trị toàn thân quanh mổ (tân hỗ trợ, miễn dịch)',
+      query: '(neoadjuvant[tiab] OR "perioperative chemotherapy"[tiab] OR immunotherapy[tiab]) AND (resectable[tiab] OR surgery[tiab]) AND "Neoplasms"[MeSH]' },
+    { id: 'ctdna', name: 'ctDNA và sinh thiết lỏng',
+      query: '("Circulating Tumor DNA"[MeSH] OR ctDNA[tiab] OR "liquid biopsy"[tiab]) AND (colorectal[tiab] OR gastric[tiab] OR surgery[tiab] OR resection[tiab])' },
+    { id: 'vn', name: 'Ung thư tại Việt Nam',
+      query: '"Neoplasms"[MeSH] AND (Vietnam[ad] OR Vietnam[tiab])' }
+  ];
+
+  var DEFAULT_GUIDES = [
+    { id: 'nccn', group: 'Ung thư học', name: 'NCCN Guidelines', url: 'https://www.nccn.org/guidelines/category_1', note: 'Phổ biến nhất tại Việt Nam; đối chiếu số phiên bản theo từng cơ quan' },
+    { id: 'asco', group: 'Ung thư học', name: 'ASCO Guidelines', url: 'https://guidelines.asco.org', note: 'Guideline và cập nhật nhanh' },
+    { id: 'esmo', group: 'Ung thư học', name: 'ESMO Guidelines', url: 'https://www.esmo.org/guidelines', note: 'Khuyến cáo châu Âu, hay dùng để đối chiếu với NCCN' },
+    { id: 'ascrs', group: 'Ngoại khoa', name: 'ASCRS', url: 'https://fascrs.org', note: 'Phẫu thuật đại-trực tràng' },
+    { id: 'sages', group: 'Ngoại khoa', name: 'SAGES', url: 'https://www.sages.org', note: 'Nội soi và robot' },
+    { id: 'eras', group: 'Ngoại khoa', name: 'ERAS Society', url: 'https://erassociety.org', note: 'Phục hồi sau mổ theo chuyên khoa' },
+    { id: 'ihpba', group: 'Ngoại khoa', name: 'IHPBA', url: 'https://ihpba.org', note: 'Gan, mật, tụy' },
+    { id: 'sso', group: 'Ngoại khoa', name: 'Society of Surgical Oncology', url: 'https://www.surgonc.org', note: 'Bờ cắt, nạo hạch' },
+    { id: 'acs', group: 'Ngoại khoa', name: 'American College of Surgeons', url: 'https://www.facs.org', note: 'NSQIP, chăm sóc quanh mổ' },
+    { id: 'acpgbi', group: 'Ngoại khoa', name: 'ACPGBI', url: 'https://www.acpgbi.org.uk', note: 'Đại-trực tràng, Anh' },
+    { id: 'wses', group: 'Ngoại khoa', name: 'WSES', url: 'https://wjes.biomedcentral.com', note: 'Ngoại khoa cấp cứu' },
+    { id: 'nice', group: 'Chứng cứ tổng hợp', name: 'NICE Guidance', url: 'https://www.nice.org.uk/guidance', note: 'Hướng dẫn lâm sàng Anh' },
+    { id: 'cochrane', group: 'Chứng cứ tổng hợp', name: 'Cochrane Library', url: 'https://www.cochranelibrary.com', note: 'Systematic review, meta-analysis' },
+    { id: 'ctgov', group: 'Chứng cứ tổng hợp', name: 'ClinicalTrials.gov', url: 'https://clinicaltrials.gov', note: 'Thử nghiệm mới đăng ký và kết quả' },
+    { id: 'moh', group: 'Việt Nam', name: 'Bộ Y tế', url: 'https://moh.gov.vn', note: 'Phác đồ, quyết định, thông báo' },
+    { id: 'vbpl', group: 'Việt Nam', name: 'Cổng văn bản pháp luật y tế', url: 'https://vanban.moh.gov.vn', note: 'Tra thông tư, nghị định mới' },
+    { id: 'kcb', group: 'Việt Nam', name: 'Cục Quản lý Khám, chữa bệnh', url: 'https://kcb.vn', note: 'Cấp phép, khám chữa bệnh' },
+    { id: 'bhxh', group: 'Việt Nam', name: 'Bảo hiểm xã hội Việt Nam', url: 'https://baohiemxahoi.gov.vn', note: 'BHYT, thanh toán' },
+    { id: 'dav', group: 'Việt Nam', name: 'Cục Quản lý Dược', url: 'https://dav.gov.vn', note: 'Đăng ký thuốc, cảnh báo thuốc' }
+  ];
+  var GROUP_ORDER = ['Ung thư học', 'Ngoại khoa', 'Chứng cứ tổng hợp', 'Việt Nam', 'Của tôi'];
+
+  /* Bộ sưu tập Mini Medical Hub gốc */
+  var HUB = [
+    { title: 'Tra cứu lâm sàng', items: [
+      { name: 'UpToDate', url: 'https://www.uptodate.com', desc: 'Tra cứu lâm sàng hàng đầu, có evidence và grading' },
+      { name: 'DynaMed', url: 'https://www.dynamed.com', desc: 'Cập nhật theo bằng chứng, tra cứu tại điểm chăm sóc' },
+      { name: 'BMJ Best Practice', url: 'https://bestpractice.bmj.com', desc: 'Hướng dẫn chẩn đoán và điều trị' },
+      { name: 'ClinicalKey', url: 'https://www.clinicalkey.com', desc: 'Thư viện y khoa tổng hợp của Elsevier' }
+    ] },
+    { title: 'Tài liệu và hướng dẫn', items: [
+      { name: 'PubMed', url: 'https://pubmed.ncbi.nlm.nih.gov/', desc: 'Cơ sở dữ liệu nghiên cứu MEDLINE' },
+      { name: 'Cochrane Library', url: 'https://www.cochranelibrary.com', desc: 'Phân tích tổng hợp, systematic review' },
+      { name: 'NICE', url: 'https://www.nice.org.uk', desc: 'Hướng dẫn lâm sàng Anh, dựa trên chứng cứ' },
+      { name: 'WSES', url: 'https://wjes.biomedcentral.com', desc: 'Ngoại khoa cấp cứu' },
+      { name: 'ACPGBI', url: 'https://www.acpgbi.org.uk', desc: 'Ngoại đại-trực tràng' }
+    ] },
+    { title: 'Thông tin thuốc', items: [
+      { name: 'Medscape Drugs', url: 'https://reference.medscape.com/drugs', desc: 'Tra cứu thuốc: liều, chỉ định, chống chỉ định' },
+      { name: 'Drugs.com', url: 'https://www.drugs.com', desc: 'Kiểm tra tương tác thuốc' }
+    ] },
+    { title: 'Ngoại khoa tổng quan', items: [
+      { name: 'ACS', url: 'https://www.facs.org', desc: 'American College of Surgeons: guideline, NSQIP' },
+      { name: 'SAGES', url: 'https://www.sages.org', desc: 'Phẫu thuật nội soi, robot' }
+    ] },
+    { title: 'Ngoại khoa chuyên sâu và công cụ', items: [
+      { name: 'AO Surgery', url: 'https://surgeryreference.aofoundation.org', desc: 'Chấn thương chỉnh hình' },
+      { name: 'WebSurg', url: 'https://www.websurg.com', desc: 'Video phẫu thuật, kỹ thuật phẫu thuật ít xâm lấn' },
+      { name: 'Risk Surgery Calculator', url: 'https://riskcalculator.facs.org', desc: 'Tính nguy cơ phẫu thuật theo NSQIP' }
+    ] }
+  ];
+
+  var WINDOWS = [
+    { d: 7, seg: '7 ngày', title: '7 ngày qua' },
+    { d: 30, seg: '30 ngày', title: '30 ngày qua' },
+    { d: 90, seg: '90 ngày', title: '90 ngày qua' },
+    { d: 365, seg: '12 tháng', title: '12 tháng qua' }
+  ];
+  var NOTABLE = {
+    'Randomized Controlled Trial': 'RCT',
+    'Meta-Analysis': 'Meta-analysis',
+    'Systematic Review': 'Tổng quan hệ thống',
+    'Practice Guideline': 'Guideline',
+    'Guideline': 'Guideline'
+  };
+
+  var topics = store.get('ymvan.topics.v1', null) || clone(DEFAULT_TOPICS);
+  var guides = store.get('ymvan.guides.v1', null) || clone(DEFAULT_GUIDES);
+  var windowDays = store.get('ymvan.window.v1', 30);
+  var editingTopic = null;
+  var addingGuide = false;
+  var counts = {};       // khóa -> số bài | 'wait' | 'err'
+  var quick = {};        // id chủ đề -> trạng thái xem nhanh
+  var liveFailed = false;
+
+  /* ---------- tiện ích ---------- */
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v === false || v == null) return;
+      if (k === 'class') el.className = v;
+      else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2), v);
+      else if (v === true) el.setAttribute(k, '');
+      else el.setAttribute(k, v);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      [].concat(arguments[i]).forEach(function (kid) {
+        if (kid == null || kid === false) return;
+        el.append(kid.nodeType ? kid : document.createTextNode(kid));
+      });
+    }
+    return el;
+  }
+  function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function slash(d) { return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()); }
+  function fromIso(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function vn(d) { return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); }
+  function today() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+  function daysAgo(n) { var d = today(); d.setDate(d.getDate() - n); return d; }
+  function daysSince(s) { return Math.round((today() - fromIso(s)) / 864e5); }
+  function ago(s) { var n = daysSince(s); return n <= 0 ? 'hôm nay' : n === 1 ? 'hôm qua' : n + ' ngày trước'; }
+  function plain(s) { return String(s || '').replace(/<[^>]+>/g, '').trim(); }
+  function fold(s) { return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase(); }
+
+  function pubmed(query, from, extra) {
+    var term = '(' + query + ')';
+    if (extra) term += ' AND (' + extra + ')';
+    if (from) term += ' AND ("' + slash(from) + '"[edat] : "3000"[edat])';
+    return 'https://pubmed.ncbi.nlm.nih.gov/?term=' + encodeURIComponent(term) + '&sort=date&size=50';
+  }
+  function copyText(text, btn) {
+    var label = btn.textContent;
+    function done(ok) {
+      btn.textContent = ok ? 'Đã sao chép' : 'Chưa sao chép được, mở "Xem truy vấn"';
+      setTimeout(function () { btn.textContent = label; }, 2200);
+    }
+    var fallback = function () {
+      var ok = false;
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        ok = document.execCommand('copy'); ta.remove();
+      } catch (e) {}
+      done(ok);
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
+  }
+  function twoStep(label, onConfirm) {
+    var armed = false, timer = null;
+    var btn = h('button', { class: 'btn quiet danger', type: 'button' }, label);
+    btn.addEventListener('click', function () {
+      if (!armed) {
+        armed = true; btn.textContent = 'Bấm lần nữa để xác nhận';
+        timer = setTimeout(function () { armed = false; btn.textContent = label; }, 4000);
+      } else { clearTimeout(timer); onConfirm(); }
+    });
+    return btn;
+  }
+  function saveTopics() { store.set('ymvan.topics.v1', topics); }
+  function saveGuides() { store.set('ymvan.guides.v1', guides); }
+
+  /* ---------- gọi PubMed (E-utilities), giãn cách để không quá giới hạn ---------- */
+  var EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
+  var pending = [], running = false;
+  function schedule(fn, priority) {
+    return new Promise(function (resolve, reject) {
+      var job = { fn: fn, resolve: resolve, reject: reject };
+      if (priority) pending.unshift(job); else pending.push(job);
+      pump();
+    });
+  }
+  function pump() {
+    if (running) return;
+    var job = pending.shift();
+    if (!job) return;
+    running = true;
+    Promise.resolve().then(job.fn).then(job.resolve, job.reject).then(function () {
+      setTimeout(function () { running = false; pump(); }, 380);
+    });
+  }
+  function getJson(url) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    });
+  }
+  function esearch(query, from, retmax, priority) {
+    var url = EUTILS + 'esearch.fcgi?db=pubmed&retmode=json&retmax=' + retmax +
+      '&sort=pub_date&datetype=edat&mindate=' + slash(from) + '&maxdate=' + slash(today()) +
+      '&term=' + encodeURIComponent(query);
+    return schedule(function () { return getJson(url); }, priority).then(function (j) {
+      var e = (j && j.esearchresult) || {};
+      if (e.ERROR || e.count === undefined) throw new Error(e.ERROR || 'no result');
+      return { count: parseInt(e.count, 10) || 0, ids: e.idlist || [] };
+    });
+  }
+  function esummary(ids, priority) {
+    var url = EUTILS + 'esummary.fcgi?db=pubmed&retmode=json&id=' + ids.join(',');
+    return schedule(function () { return getJson(url); }, priority).then(function (j) {
+      var r = (j && j.result) || {};
+      return (r.uids || []).map(function (id) {
+        var x = r[id] || {};
+        var au = x.authors || [];
+        return {
+          id: id,
+          title: plain(x.title) || '(không có tiêu đề)',
+          source: plain(x.source),
+          date: plain(x.pubdate || x.epubdate),
+          authors: au.slice(0, 3).map(function (a) { return a.name; }).join(', ') + (au.length > 3 ? ' và cs.' : ''),
+          tags: (x.pubtype || []).map(function (t) { return NOTABLE[t]; }).filter(function (t, i, a) { return t && a.indexOf(t) === i; })
+        };
+      });
+    });
+  }
+
+  /* ---------- tab ---------- */
+  var tabs = ['papers', 'guides', 'hub', 'alerts'];
+  tabs.forEach(function (t) {
+    document.getElementById('tab-' + t).addEventListener('click', function () {
+      tabs.forEach(function (o) {
+        document.getElementById('tab-' + o).setAttribute('aria-selected', o === t ? 'true' : 'false');
+        document.getElementById('panel-' + o).hidden = (o !== t);
+      });
+    });
+  });
+
+  /* ---------- công bố mới ---------- */
+  function renderWindow() {
+    var w = WINDOWS.filter(function (x) { return x.d === windowDays; })[0] || WINDOWS[1];
+    document.getElementById('hero-title').textContent = w.title;
+    document.getElementById('hero-range').textContent = 'Từ ' + vn(daysAgo(w.d)) + ' đến ' + vn(new Date());
+    var seg = document.getElementById('seg');
+    seg.textContent = '';
+    WINDOWS.forEach(function (x) {
+      seg.append(h('button', {
+        type: 'button', 'aria-pressed': x.d === windowDays ? 'true' : 'false',
+        onclick: function () { windowDays = x.d; store.set('ymvan.window.v1', windowDays); quick = {}; renderWindow(); renderTopics(); }
+      }, x.seg));
+    });
+  }
+
+  function countKey(t, from) { return t.id + '|' + iso(from) + '|' + t.query; }
+  function fetchCount(t, from) {
+    var k = countKey(t, from);
+    if (k in counts) return;
+    counts[k] = 'wait';
+    esearch(t.query, from, 0, false).then(
+      function (r) { counts[k] = r.count; },
+      function () { counts[k] = 'err'; liveFailed = true; }
+    ).then(function () { if (editingTopic === null) renderTopics(); });
+  }
+  function ensureCounts() {
+    var from = daysAgo(windowDays);
+    topics.forEach(function (t) {
+      fetchCount(t, from);
+      if (t.viewed) fetchCount(t, fromIso(t.viewed));
+    });
+  }
+  function countOf(t, from) {
+    var v = counts[countKey(t, from)];
+    return typeof v === 'number' ? v : null;
+  }
+
+  function toggleQuick(t) {
+    var q = quick[t.id] || (quick[t.id] = { open: false, state: 'idle', items: [], total: 0 });
+    q.open = !q.open;
+    if (q.open && q.state === 'idle') {
+      q.state = 'loading';
+      esearch(t.query, daysAgo(windowDays), 10, true).then(function (r) {
+        q.total = r.count;
+        return r.ids.length ? esummary(r.ids, true) : [];
+      }).then(function (items) { q.items = items; q.state = 'ok'; },
+              function () { q.state = 'err'; })
+        .then(function () { if (editingTopic === null) renderTopics(); });
+    }
+    renderTopics();
+  }
+  function quickPanel(t) {
+    var q = quick[t.id];
+    if (!q || !q.open) return null;
+    var body;
+    if (q.state === 'loading') body = h('p', { class: 'row-meta' }, 'Đang tải từ PubMed...');
+    else if (q.state === 'err') body = h('p', { class: 'row-meta', role: 'alert' }, 'Không tải được từ PubMed lúc này. Bạn vẫn dùng được các nút mở PubMed ở trên.');
+    else if (!q.items.length) body = h('p', { class: 'row-meta' }, 'Không có bài mới trong khoảng thời gian này.');
+    else {
+      var nodes = q.items.map(function (it) {
+        return h('div', { class: 'qitem' },
+          h('a', { href: 'https://pubmed.ncbi.nlm.nih.gov/' + it.id + '/', target: '_blank', rel: 'noopener noreferrer' }, it.title),
+          h('p', { class: 'row-meta' }, it.tags.map(function (tg) { return h('span', { class: 'tag' }, tg); }),
+            [it.authors, it.source, it.date].filter(Boolean).join(' - ')));
+      });
+      body = h('div', {},
+        h('p', { class: 'row-meta' }, 'Hiển thị ' + q.items.length + ' trong ' + q.total + ' bài mới nhất.'),
+        nodes,
+        h('a', { class: 'btn', href: pubmed(t.query, daysAgo(windowDays)), target: '_blank', rel: 'noopener noreferrer' }, 'Xem tất cả trên PubMed'));
+    }
+    return h('div', { class: 'quick' }, body);
+  }
+
+  function topicEditor(t, isNew) {
+    var name = h('input', { class: 'field', type: 'text', id: 'ed-name', value: t.name });
+    var query = h('textarea', { class: 'field', rows: '4', id: 'ed-query' });
+    query.value = t.query;
+    var err = h('p', { class: 'row-meta', role: 'alert' });
+    var save = h('button', { class: 'btn primary', type: 'button', onclick: function () {
+      var n = name.value.trim(), q = query.value.trim();
+      if (!n || !q) { err.textContent = 'Cần nhập cả tên chủ đề và truy vấn PubMed.'; return; }
+      if (isNew) topics.push({ id: uid('t'), name: n, query: q });
+      else { t.name = n; t.query = q; delete quick[t.id]; }
+      saveTopics(); editingTopic = null; renderTopics(); renderAlertTopics();
+    } }, 'Lưu');
+    var cancel = h('button', { class: 'btn', type: 'button', onclick: function () { editingTopic = null; renderTopics(); } }, 'Hủy');
+    var actions = [save, cancel];
+    if (!isNew) actions.push(twoStep('Xóa chủ đề', function () {
+      topics = topics.filter(function (x) { return x.id !== t.id; });
+      saveTopics(); editingTopic = null; renderTopics(); renderAlertTopics();
+    }));
+    return h('div', { class: 'row' },
+      h('div', { class: 'editor' },
+        h('label', { class: 'field-label', for: 'ed-name' }, 'Tên chủ đề'), name,
+        h('label', { class: 'field-label', for: 'ed-query' }, 'Truy vấn PubMed (không cần thêm điều kiện ngày)'), query,
+        err,
+        h('div', { class: 'editor-actions' }, actions)));
+  }
+
+  function renderTopics() {
+    document.getElementById('live-note').textContent = liveFailed
+      ? 'Chưa lấy được số bài từ PubMed lúc này (có thể mạng đang chặn). Các nút bên dưới vẫn mở được PubMed.'
+      : 'Số bài bên cạnh mỗi chủ đề được đếm trực tiếp từ PubMed mỗi lần mở trang.';
+    var box = document.getElementById('topics');
+    box.textContent = '';
+    var from = daysAgo(windowDays);
+    topics.forEach(function (t) {
+      if (editingTopic === t.id) { box.append(topicEditor(t, false)); return; }
+      function mark() { setTimeout(function () { t.viewed = iso(new Date()); saveTopics(); renderTopics(); }, 0); }
+      function link(label, url, primary) {
+        return h('a', { class: 'btn' + (primary ? ' primary' : ''), href: url, target: '_blank', rel: 'noopener noreferrer', onclick: mark }, label);
+      }
+      var inWindow = countOf(t, from);
+      var sinceView = t.viewed ? countOf(t, fromIso(t.viewed)) : null;
+      var q = quick[t.id];
+      var actions = [
+        h('button', { class: 'btn', type: 'button', 'aria-expanded': q && q.open ? 'true' : 'false', onclick: function () { toggleQuick(t); } }, q && q.open ? 'Ẩn xem nhanh' : 'Xem nhanh'),
+        link('Mới nhất', pubmed(t.query, from), true),
+        link('RCT', pubmed(t.query, from, 'randomized controlled trial[pt]')),
+        link('Tổng quan hệ thống', pubmed(t.query, from, 'meta-analysis[pt] OR systematic review[pt]')),
+        link('Guideline', pubmed(t.query, from, 'practice guideline[pt] OR guideline[pt] OR consensus development conference[pt]'))
+      ];
+      if (t.viewed) actions.push(link('Từ lần xem ' + vn(fromIso(t.viewed)), pubmed(t.query, fromIso(t.viewed))));
+      actions.push(h('button', { class: 'btn quiet', type: 'button', onclick: function () { editingTopic = t.id; renderTopics(); } }, 'Sửa'));
+
+      var meta = t.viewed ? 'Xem lần cuối ' + vn(fromIso(t.viewed)) + ' (' + ago(t.viewed) + ').' : 'Chưa xem lần nào.';
+      if (t.viewed && sinceView !== null) meta += sinceView > 0 ? ' Từ đó có ' + sinceView + ' bài mới.' : ' Từ đó chưa có bài mới.';
+
+      box.append(h('div', { class: 'row' },
+        h('div', { class: 'row-main' },
+          h('p', { class: 'row-name' }, t.name,
+            inWindow !== null ? h('span', { class: 'pill' }, inWindow + ' bài') : null,
+            (t.viewed && sinceView) ? h('span', { class: 'pill new' }, sinceView + ' mới từ lần xem') : null),
+          h('p', { class: 'row-meta' }, meta)),
+        h('div', { class: 'row-actions' }, actions),
+        quickPanel(t)));
+    });
+    if (editingTopic === 'new') box.append(topicEditor({ name: '', query: '' }, true));
+
+    var foot = document.getElementById('topics-foot');
+    foot.textContent = '';
+    foot.append(
+      h('button', { class: 'btn', type: 'button', onclick: function () { editingTopic = 'new'; renderTopics(); var e = document.getElementById('ed-name'); if (e) e.focus(); } }, 'Thêm chủ đề'),
+      twoStep('Khôi phục chủ đề mặc định', function () { topics = clone(DEFAULT_TOPICS); saveTopics(); quick = {}; editingTopic = null; renderTopics(); renderAlertTopics(); })
+    );
+    ensureCounts();
+  }
+
+  /* ---------- guideline và quy định ---------- */
+  function renderGuides() {
+    var box = document.getElementById('guides');
+    box.textContent = '';
+    GROUP_ORDER.forEach(function (grp) {
+      var items = guides.filter(function (g) { return (g.group || 'Của tôi') === grp; });
+      if (!items.length) return;
+      box.append(h('h2', { class: 'group-title' }, grp));
+      var list = h('div', { class: 'list' });
+      items.forEach(function (g) {
+        var stale = !g.checked || daysSince(g.checked) > 30;
+        var status = g.checked
+          ? h('span', { class: 'flag ' + (stale ? 'warn' : 'ok') }, stale ? 'Đã ' + daysSince(g.checked) + ' ngày chưa kiểm tra' : 'Kiểm tra ' + ago(g.checked))
+          : h('span', { class: 'flag warn' }, 'Chưa kiểm tra lần nào');
+        var ver = h('input', { class: 'field version', type: 'text', placeholder: 'Phiên bản đang dùng', 'aria-label': 'Phiên bản đang dùng của ' + g.name, value: g.version || '' });
+        ver.addEventListener('change', function () { g.version = ver.value.trim(); saveGuides(); });
+        list.append(h('div', { class: 'row' },
+          h('div', { class: 'row-main' },
+            h('p', { class: 'row-name' }, g.name),
+            g.note ? h('p', { class: 'row-meta' }, g.note) : null,
+            h('p', { class: 'row-meta' }, status)),
+          h('div', { class: 'row-actions' },
+            ver,
+            h('a', { class: 'btn primary', href: g.url, target: '_blank', rel: 'noopener noreferrer' }, 'Mở trang'),
+            h('button', { class: 'btn', type: 'button', onclick: function () { g.checked = iso(new Date()); saveGuides(); renderGuides(); } }, 'Đã kiểm tra'),
+            twoStep('Xóa', function () { guides = guides.filter(function (x) { return x.id !== g.id; }); saveGuides(); renderGuides(); }))));
+      });
+      box.append(list);
+    });
+
+    var foot = document.getElementById('guides-foot');
+    foot.textContent = '';
+    if (addingGuide) {
+      var n = h('input', { class: 'field', type: 'text', id: 'g-name', placeholder: 'Tên nguồn' });
+      var u = h('input', { class: 'field', type: 'url', id: 'g-url', placeholder: 'https://...' });
+      var err = h('p', { class: 'row-meta', role: 'alert' });
+      foot.append(h('div', { class: 'editor' },
+        h('label', { class: 'field-label', for: 'g-name' }, 'Tên nguồn'), n,
+        h('label', { class: 'field-label', for: 'g-url' }, 'Địa chỉ trang'), u, err,
+        h('div', { class: 'editor-actions' },
+          h('button', { class: 'btn primary', type: 'button', onclick: function () {
+            var name = n.value.trim(), url = u.value.trim();
+            if (!name || !/^https?:\/\//i.test(url)) { err.textContent = 'Cần tên nguồn và địa chỉ bắt đầu bằng http:// hoặc https://.'; return; }
+            guides.push({ id: uid('g'), group: 'Của tôi', name: name, url: url });
+            saveGuides(); addingGuide = false; renderGuides();
+          } }, 'Thêm'),
+          h('button', { class: 'btn', type: 'button', onclick: function () { addingGuide = false; renderGuides(); } }, 'Hủy'))));
+    } else {
+      foot.append(
+        h('button', { class: 'btn', type: 'button', onclick: function () { addingGuide = true; renderGuides(); var e = document.getElementById('g-name'); if (e) e.focus(); } }, 'Thêm nguồn theo dõi'),
+        twoStep('Khôi phục nguồn mặc định', function () { guides = clone(DEFAULT_GUIDES); saveGuides(); renderGuides(); })
+      );
+    }
+  }
+
+  /* ---------- tra cứu nhanh (Mini Medical Hub gốc) ---------- */
+  function renderHub(filter) {
+    var box = document.getElementById('hub');
+    box.textContent = '';
+    var f = fold(filter || '').trim();
+    var shown = 0;
+    HUB.forEach(function (sec) {
+      var items = sec.items.filter(function (it) { return !f || fold(it.name + ' ' + it.desc + ' ' + sec.title).indexOf(f) !== -1; });
+      if (!items.length) return;
+      box.append(h('h2', { class: 'group-title' }, sec.title));
+      var list = h('div', { class: 'list' });
+      items.forEach(function (it) {
+        shown++;
+        list.append(h('div', { class: 'row' },
+          h('div', { class: 'row-main' },
+            h('p', { class: 'row-name' }, h('a', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, it.name)),
+            h('p', { class: 'row-meta' }, it.desc)),
+          h('div', { class: 'row-actions' },
+            h('a', { class: 'btn', href: it.url, target: '_blank', rel: 'noopener noreferrer' }, 'Mở trang'))));
+      });
+      box.append(list);
+    });
+    if (!shown) box.append(h('p', { class: 'note' }, 'Không có mục nào khớp. Thử từ khóa ngắn hơn, ví dụ "thuốc" hoặc "nội soi".'));
+  }
+  document.getElementById('hub-filter').addEventListener('input', function (e) { renderHub(e.target.value); });
+
+  /* ---------- cảnh báo ---------- */
+  function renderAlertTopics() {
+    var box = document.getElementById('alert-topics');
+    box.textContent = '';
+    topics.forEach(function (t) {
+      var copy = h('button', { class: 'btn', type: 'button' }, 'Sao chép truy vấn');
+      copy.addEventListener('click', function () { copyText(t.query, copy); });
+      box.append(h('div', { class: 'row' },
+        h('div', { class: 'row-main' },
+          h('p', { class: 'row-name' }, t.name),
+          h('details', { class: 'q' }, h('summary', {}, 'Xem truy vấn'), h('code', {}, t.query))),
+        h('div', { class: 'row-actions' },
+          copy,
+          h('a', { class: 'btn primary', href: pubmed(t.query, null), target: '_blank', rel: 'noopener noreferrer' }, 'Mở PubMed để đặt cảnh báo'))));
+    });
+  }
+
+  renderWindow();
+  renderTopics();
+  renderGuides();
+  renderHub('');
+  renderAlertTopics();
+})();
+</script>
+</body>
+</html>
