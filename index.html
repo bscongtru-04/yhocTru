@@ -240,7 +240,7 @@
 
   var DEFAULT_GUIDES = [
     { id: 'nccn', group: 'Ung thư học', name: 'NCCN Guidelines', url: 'https://www.nccn.org/guidelines/category_1', note: 'Phổ biến nhất tại Việt Nam; đối chiếu số phiên bản theo từng cơ quan' },
-    { id: 'asco', group: 'Ung thư học', name: 'ASCO Guidelines', url: 'https://guidelines.asco.org', note: 'Guideline và cập nhật nhanh' },
+    { id: 'asco', group: 'Ung thư học', name: 'ASCO Guidelines', url: 'https://www.asco.org/practice-patients/guidelines', note: 'Guideline và cập nhật nhanh' },
     { id: 'esmo', group: 'Ung thư học', name: 'ESMO Guidelines', url: 'https://www.esmo.org/guidelines', note: 'Khuyến cáo châu Âu, hay dùng để đối chiếu với NCCN' },
     { id: 'ascrs', group: 'Ngoại khoa', name: 'ASCRS', url: 'https://fascrs.org', note: 'Phẫu thuật đại-trực tràng' },
     { id: 'sages', group: 'Ngoại khoa', name: 'SAGES', url: 'https://www.sages.org', note: 'Nội soi và robot' },
@@ -254,7 +254,7 @@
     { id: 'cochrane', group: 'Chứng cứ tổng hợp', name: 'Cochrane Library', url: 'https://www.cochranelibrary.com', note: 'Systematic review, meta-analysis' },
     { id: 'ctgov', group: 'Chứng cứ tổng hợp', name: 'ClinicalTrials.gov', url: 'https://clinicaltrials.gov', note: 'Thử nghiệm mới đăng ký và kết quả' },
     { id: 'moh', group: 'Việt Nam', name: 'Bộ Y tế', url: 'https://moh.gov.vn', note: 'Phác đồ, quyết định, thông báo' },
-    { id: 'vbpl', group: 'Việt Nam', name: 'Cổng văn bản pháp luật y tế', url: 'https://vanban.moh.gov.vn', note: 'Tra thông tư, nghị định mới' },
+    { id: 'vbpl', group: 'Việt Nam', name: 'CSDL quốc gia về pháp luật', url: 'https://vbpl.vn', note: 'Tra thông tư, nghị định mới nhất, gồm văn bản của Bộ Y tế' },
     { id: 'kcb', group: 'Việt Nam', name: 'Cục Quản lý Khám, chữa bệnh', url: 'https://kcb.vn', note: 'Cấp phép, khám chữa bệnh' },
     { id: 'bhxh', group: 'Việt Nam', name: 'Bảo hiểm xã hội Việt Nam', url: 'https://baohiemxahoi.gov.vn', note: 'BHYT, thanh toán' },
     { id: 'dav', group: 'Việt Nam', name: 'Cục Quản lý Dược', url: 'https://dav.gov.vn', note: 'Đăng ký thuốc, cảnh báo thuốc' }
@@ -308,6 +308,25 @@
   var topics = store.get('ymvan.topics.v1', null) || clone(DEFAULT_TOPICS);
   var guides = store.get('ymvan.guides.v1', null) || clone(DEFAULT_GUIDES);
   var windowDays = store.get('ymvan.window.v1', 30);
+
+  /* Sửa địa chỉ cũ đã hỏng trong danh sách nguồn đã lưu sẵn trên trình duyệt */
+  (function migrateGuides() {
+    var fixes = {
+      'https://guidelines.asco.org': { url: 'https://www.asco.org/practice-patients/guidelines' },
+      'https://vanban.moh.gov.vn': { url: 'https://vbpl.vn', from: 'Cổng văn bản pháp luật y tế',
+        name: 'CSDL quốc gia về pháp luật', note: 'Tra thông tư, nghị định mới nhất, gồm văn bản của Bộ Y tế' }
+    };
+    var changed = false;
+    guides.forEach(function (g) {
+      var fix = fixes[String(g.url || '').replace(/\/+$/, '')];
+      if (!fix) return;
+      g.url = fix.url;
+      if (fix.name && g.name === fix.from) { g.name = fix.name; g.note = fix.note; }
+      changed = true;
+    });
+    if (changed) saveGuides();
+  })();
+
   var editingTopic = null;
   var addingGuide = false;
   var counts = {};       // khóa -> số bài | 'wait' | 'err'
@@ -388,9 +407,19 @@
   function saveTopics() { store.set('ymvan.topics.v1', topics); }
   function saveGuides() { store.set('ymvan.guides.v1', guides); }
 
-  /* ---------- gọi PubMed (E-utilities), giãn cách để không quá giới hạn ---------- */
+  /* ---------- gọi PubMed (E-utilities) ----------
+     NCBI chặn tạm thời IP nếu gọi dồn dập. Vì vậy trang này: gọi chậm (khoảng 1 yêu cầu/giây),
+     nhớ số bài đã đếm trong 6 giờ, khai báo tên ứng dụng (tool), và tự ngừng gọi 15 phút
+     khi NCBI trả lỗi để không làm việc bị chặn kéo dài thêm. */
   var EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
+  var TOOL = '&tool=yhocTru';
+  var GAP_MS = 1100;
+  var CACHE_MS = 6 * 3600 * 1000;
+  var BACKOFF_MS = 15 * 60 * 1000;
+  var blockedUntil = +store.get('ymvan.blocked.v1', 0) || 0;
   var pending = [], running = false;
+  function isBlocked() { return Date.now() < blockedUntil; }
+  function setBlocked(ms) { blockedUntil = ms ? Date.now() + ms : 0; store.set('ymvan.blocked.v1', blockedUntil); }
   function schedule(fn, priority) {
     return new Promise(function (resolve, reject) {
       var job = { fn: fn, resolve: resolve, reject: reject };
@@ -402,21 +431,46 @@
     if (running) return;
     var job = pending.shift();
     if (!job) return;
+    if (isBlocked()) { job.reject(new Error('blocked')); pump(); return; }
     running = true;
     Promise.resolve().then(job.fn).then(job.resolve, job.reject).then(function () {
-      setTimeout(function () { running = false; pump(); }, 380);
+      setTimeout(function () { running = false; pump(); }, GAP_MS);
     });
   }
   function getJson(url) {
     return fetch(url).then(function (r) {
       if (!r.ok) throw new Error('http ' + r.status);
       return r.json();
+    }).then(function (j) {
+      if (blockedUntil) setBlocked(0);
+      return j;
+    }, function (e) {
+      /* Mất mạng, hoặc NCBI từ chối (503/429 kèm trang chặn, trình duyệt báo TypeError) */
+      if (e instanceof TypeError || /^http (429|5\d\d)$/.test(e.message)) setBlocked(BACKOFF_MS);
+      throw e;
     });
+  }
+  function retryNow() {
+    setBlocked(0);
+    Object.keys(counts).forEach(function (k) { if (counts[k] === 'err') delete counts[k]; });
+    liveFailed = false;
+    quick = {};
+    renderTopics();
+  }
+  function cachedCount(k) {
+    var c = store.get('ymvan.counts.v1', {})[k];
+    return (c && Date.now() - c.t < CACHE_MS) ? c.v : null;
+  }
+  function cacheCount(k, v) {
+    var all = store.get('ymvan.counts.v1', {}), now = Date.now(), out = {};
+    Object.keys(all).forEach(function (x) { if (now - all[x].t < CACHE_MS) out[x] = all[x]; });
+    out[k] = { v: v, t: now };
+    store.set('ymvan.counts.v1', out);
   }
   function esearch(query, from, retmax, priority) {
     var url = EUTILS + 'esearch.fcgi?db=pubmed&retmode=json&retmax=' + retmax +
       '&sort=pub_date&datetype=edat&mindate=' + slash(from) + '&maxdate=' + slash(today()) +
-      '&term=' + encodeURIComponent(query);
+      '&term=' + encodeURIComponent(query) + TOOL;
     return schedule(function () { return getJson(url); }, priority).then(function (j) {
       var e = (j && j.esearchresult) || {};
       if (e.ERROR || e.count === undefined) throw new Error(e.ERROR || 'no result');
@@ -424,7 +478,7 @@
     });
   }
   function esummary(ids, priority) {
-    var url = EUTILS + 'esummary.fcgi?db=pubmed&retmode=json&id=' + ids.join(',');
+    var url = EUTILS + 'esummary.fcgi?db=pubmed&retmode=json&id=' + ids.join(',') + TOOL;
     return schedule(function () { return getJson(url); }, priority).then(function (j) {
       var r = (j && j.result) || {};
       return (r.uids || []).map(function (id) {
@@ -472,9 +526,11 @@
   function fetchCount(t, from) {
     var k = countKey(t, from);
     if (k in counts) return;
+    var hit = cachedCount(k);
+    if (hit !== null) { counts[k] = hit; return; }
     counts[k] = 'wait';
     esearch(t.query, from, 0, false).then(
-      function (r) { counts[k] = r.count; },
+      function (r) { counts[k] = r.count; cacheCount(k, r.count); },
       function () { counts[k] = 'err'; liveFailed = true; }
     ).then(function () { if (editingTopic === null) renderTopics(); });
   }
@@ -553,9 +609,19 @@
   }
 
   function renderTopics() {
-    document.getElementById('live-note').textContent = liveFailed
-      ? 'Chưa lấy được số bài từ PubMed lúc này (có thể mạng đang chặn). Các nút bên dưới vẫn mở được PubMed.'
-      : 'Số bài bên cạnh mỗi chủ đề được đếm trực tiếp từ PubMed mỗi lần mở trang.';
+    ensureCounts();   /* nạp số bài đã nhớ trước khi vẽ; số chưa có sẽ được gọi từ từ */
+    var note = document.getElementById('live-note');
+    note.textContent = '';
+    if (isBlocked()) {
+      note.append('NCBI đang từ chối yêu cầu từ mạng của bạn (thường là bị chặn tạm thời do gọi quá nhiều). Trang đã ngừng gọi và tự thử lại sau khoảng ' +
+        Math.max(1, Math.ceil((blockedUntil - Date.now()) / 60000)) + ' phút. Các nút bên dưới vẫn mở PubMed trực tiếp. ',
+        h('button', { class: 'btn quiet', type: 'button', onclick: retryNow }, 'Thử lại ngay'));
+    } else if (liveFailed) {
+      note.append('Chưa lấy được số bài từ PubMed lúc này (có thể mạng đang chặn). Các nút bên dưới vẫn mở được PubMed. ',
+        h('button', { class: 'btn quiet', type: 'button', onclick: retryNow }, 'Thử lại ngay'));
+    } else {
+      note.append('Số bài bên cạnh mỗi chủ đề được đếm từ PubMed (nhớ tối đa 6 giờ để không gọi quá nhiều).');
+    }
     var box = document.getElementById('topics');
     box.textContent = '';
     var from = daysAgo(windowDays);
@@ -598,7 +664,6 @@
       h('button', { class: 'btn', type: 'button', onclick: function () { editingTopic = 'new'; renderTopics(); var e = document.getElementById('ed-name'); if (e) e.focus(); } }, 'Thêm chủ đề'),
       twoStep('Khôi phục chủ đề mặc định', function () { topics = clone(DEFAULT_TOPICS); saveTopics(); quick = {}; editingTopic = null; renderTopics(); renderAlertTopics(); })
     );
-    ensureCounts();
   }
 
   /* ---------- guideline và quy định ---------- */
