@@ -77,6 +77,15 @@
 
   .pill { display: inline-block; font-size: .78rem; font-weight: 500; padding: .05rem .55rem; border-radius: 999px; background: var(--hema-soft); color: var(--ink); margin-left: .5rem; vertical-align: middle; }
   .pill.new { background: var(--eosin-soft); }
+  .grp { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .6rem; width: 100%; text-align: left; font: inherit; color: var(--ink);
+    background: var(--hema-soft); border: 0; border-bottom: 1px solid var(--line); padding: .75rem .9rem; margin-top: .9rem; border-radius: 8px 8px 0 0; cursor: pointer; }
+  .grp[aria-expanded="false"] { border-radius: 8px; }
+  .grp:hover .grp-name { color: var(--hema); }
+  .grp-chev { width: 1rem; color: var(--hema); }
+  .grp-name { font: 600 1.05rem/1.3 'Newsreader', Georgia, serif; }
+  .grp-meta { color: var(--muted); font-size: .85rem; }
+  .grp .pill { margin-left: 0; }
+  .alert-group { font-weight: 600; margin: 1.25rem 0 0; color: var(--hema); }
 
   .btn {
     font: inherit; font-size: .875rem; display: inline-flex; align-items: center; min-height: 2.25rem;
@@ -131,7 +140,7 @@
 <body>
 <div class="wrap">
   <h1 class="site-title">Mini Medical Hub</h1>
-  <p class="site-sub">Tra cứu nhanh và theo dõi y văn ngoại ung bướu</p>
+  <p class="site-sub">Tra cứu nhanh và theo dõi y văn: ngoại ung bướu và các chuyên khoa liên quan</p>
 
   <div class="tabs" role="tablist" aria-label="Các mục">
     <button class="tab" role="tab" id="tab-papers" aria-controls="panel-papers" aria-selected="true">Công bố mới</button>
@@ -147,7 +156,7 @@
       <div class="seg" id="seg" role="group" aria-label="Khoảng thời gian"></div>
     </div>
     <p class="note" id="live-note"></p>
-    <p class="note">Mốc ngày là ngày bài được đưa vào PubMed, nên bắt được cả bài online-first. Bấm "Xem nhanh" để đọc tiêu đề 10 bài mới nhất ngay tại đây, hoặc dùng các nút khác để mở danh sách đầy đủ trên PubMed.</p>
+    <p class="note">Mốc ngày là ngày bài được đưa vào PubMed, nên bắt được cả bài online-first. Chủ đề được chia theo nhóm; bấm tên nhóm để mở, và chỉ nhóm đang mở mới được đếm số bài (để PubMed không chặn). Bấm "Xem nhanh" để đọc tiêu đề 10 bài mới nhất ngay tại đây, hoặc dùng các nút khác để mở danh sách đầy đủ trên PubMed.</p>
     <div class="list" id="topics"></div>
     <div class="add-row" id="topics-foot"></div>
   </section>
@@ -217,26 +226,175 @@
   var clone = function (o) { return JSON.parse(JSON.stringify(o)); };
 
   /* ---------- dữ liệu mặc định ---------- */
-  var DEFAULT_TOPICS = [
-    { id: 'dtt', name: 'Đại-trực tràng: phẫu thuật nội soi và robot',
-      query: '("Colorectal Neoplasms"[MeSH] OR colon cancer[tiab] OR rectal cancer[tiab]) AND (laparoscop*[tiab] OR robot*[tiab] OR "minimally invasive"[tiab])' },
-    { id: 'dd', name: 'Dạ dày: cắt dạ dày và nạo hạch',
-      query: '("Stomach Neoplasms"[MeSH] OR gastric cancer[tiab]) AND (gastrectomy[tiab] OR lymphadenectomy[tiab] OR surgery[tiab])' },
-    { id: 'hpb', name: 'Gan, mật, tụy',
-      query: '("Carcinoma, Hepatocellular"[MeSH] OR "Pancreatic Neoplasms"[MeSH] OR "Biliary Tract Neoplasms"[MeSH]) AND (hepatectomy[tiab] OR pancreatectomy[tiab] OR resection[tiab] OR surgery[tiab])' },
-    { id: 'vu', name: 'Vú: phẫu thuật và tạo hình ung thư',
-      query: '"Breast Neoplasms"[MeSH] AND (mastectomy[tiab] OR "breast-conserving"[tiab] OR oncoplastic[tiab] OR surgery[tiab])' },
-    { id: 'giap', name: 'Tuyến giáp',
-      query: '"Thyroid Neoplasms"[MeSH] AND (thyroidectomy[tiab] OR surgery[tiab])' },
-    { id: 'eras', name: 'ERAS và chăm sóc quanh mổ ung thư',
-      query: '("Enhanced Recovery After Surgery"[tiab] OR ERAS[tiab] OR "Perioperative Care"[MeSH]) AND (cancer[tiab] OR oncolog*[tiab])' },
-    { id: 'tanhotro', name: 'Điều trị toàn thân quanh mổ (tân hỗ trợ, miễn dịch)',
-      query: '(neoadjuvant[tiab] OR "perioperative chemotherapy"[tiab] OR immunotherapy[tiab]) AND (resectable[tiab] OR surgery[tiab]) AND "Neoplasms"[MeSH]' },
-    { id: 'ctdna', name: 'ctDNA và sinh thiết lỏng',
-      query: '("Circulating Tumor DNA"[MeSH] OR ctDNA[tiab] OR "liquid biopsy"[tiab]) AND (colorectal[tiab] OR gastric[tiab] OR surgery[tiab] OR resection[tiab])' },
-    { id: 'vn', name: 'Ung thư tại Việt Nam',
-      query: '"Neoplasms"[MeSH] AND (Vietnam[ad] OR Vietnam[tiab])' }
+  /* Chủ đề chia theo nhóm; chỉ nhóm đang mở mới gọi PubMed để đếm số bài (tránh bị NCBI chặn). */
+  var MY_GROUP = 'Của tôi';
+  var TOPIC_GROUPS = [
+    'Ngoại ung bướu theo cơ quan',
+    'Kỹ thuật, biến chứng và chăm sóc quanh mổ',
+    'Điều trị toàn thân, xạ trị và y học chính xác',
+    'Tầm soát, chẩn đoán sớm và AI',
+    'Chăm sóc hỗ trợ và sau điều trị',
+    'Sàn chậu, hậu môn và tiết niệu',
+    'Lồng ngực (ngoài ung thư)',
+    'Thần kinh',
+    'Sản phụ khoa',
+    'Quản trị, chất lượng và Việt Nam'
   ];
+  var ORIGINAL_TOPIC_IDS = ['dtt', 'dd', 'hpb', 'vu', 'giap', 'eras', 'tanhotro', 'ctdna', 'vn'];
+  var CANCER = '(cancer[tiab] OR oncolog*[tiab] OR "Neoplasms"[MeSH])';
+  var DIGEST = '"Digestive System Neoplasms"[MeSH]';
+  var DEFAULT_TOPICS = [];
+  function grp(group, list) {
+    list.forEach(function (x) { DEFAULT_TOPICS.push({ id: x[0], group: group, name: x[1], query: x[2] }); });
+  }
+
+  grp(TOPIC_GROUPS[0], [
+    ['dtt', 'Đại-trực tràng: phẫu thuật nội soi và robot',
+      '("Colorectal Neoplasms"[MeSH] OR colon cancer[tiab] OR rectal cancer[tiab]) AND (laparoscop*[tiab] OR robot*[tiab] OR "minimally invasive"[tiab])'],
+    ['trtrang', 'Trực tràng: TNT và bảo tồn cơ quan (watch-and-wait)',
+      '("Rectal Neoplasms"[MeSH] OR rectal cancer[tiab]) AND ("total neoadjuvant"[tiab] OR "watch and wait"[tiab] OR "watch-and-wait"[tiab] OR "organ preservation"[tiab] OR "nonoperative management"[tiab] OR "non-operative management"[tiab])'],
+    ['dicangan', 'Di căn gan từ đại-trực tràng',
+      '("Colorectal Neoplasms"[MeSH] OR colorectal[tiab]) AND ("liver metastases"[tiab] OR "liver metastasis"[tiab] OR "hepatic metastases"[tiab] OR "colorectal liver metastases"[tiab]) AND (resection[tiab] OR hepatectomy[tiab] OR ablation[tiab] OR surgery[tiab])'],
+    ['dd', 'Dạ dày: cắt dạ dày và nạo hạch',
+      '("Stomach Neoplasms"[MeSH] OR gastric cancer[tiab]) AND (gastrectomy[tiab] OR lymphadenectomy[tiab] OR surgery[tiab])'],
+    ['thucquan', 'Thực quản và tâm vị',
+      '("Esophageal Neoplasms"[MeSH] OR esophageal cancer[tiab] OR oesophageal cancer[tiab] OR "esophagogastric junction"[tiab]) AND (esophagectomy[tiab] OR oesophagectomy[tiab] OR resection[tiab] OR surgery[tiab])'],
+    ['hpb', 'Gan, mật, tụy',
+      '("Carcinoma, Hepatocellular"[MeSH] OR "Pancreatic Neoplasms"[MeSH] OR "Biliary Tract Neoplasms"[MeSH]) AND (hepatectomy[tiab] OR pancreatectomy[tiab] OR resection[tiab] OR surgery[tiab])'],
+    ['phucmac', 'Di căn phúc mạc: CRS, HIPEC, PIPAC',
+      '("Peritoneal Neoplasms"[MeSH] OR "peritoneal metastases"[tiab] OR "peritoneal metastasis"[tiab] OR "peritoneal carcinomatosis"[tiab]) AND (cytoreductive[tiab] OR HIPEC[tiab] OR PIPAC[tiab] OR "Hyperthermic Intraperitoneal Chemotherapy"[MeSH])'],
+    ['vu', 'Vú: phẫu thuật và tạo hình ung thư',
+      '"Breast Neoplasms"[MeSH] AND (mastectomy[tiab] OR "breast-conserving"[tiab] OR oncoplastic[tiab] OR surgery[tiab])'],
+    ['giap', 'Tuyến giáp',
+      '"Thyroid Neoplasms"[MeSH] AND (thyroidectomy[tiab] OR surgery[tiab])'],
+    ['daucoc', 'Đầu cổ (ngoài tuyến giáp)',
+      '"Head and Neck Neoplasms"[MeSH] AND (surgery[tiab] OR resection[tiab] OR "neck dissection"[tiab]) NOT "Thyroid Neoplasms"[MeSH]'],
+    ['phoi', 'Phổi và lồng ngực',
+      '("Lung Neoplasms"[MeSH] OR lung cancer[tiab]) AND (lobectomy[tiab] OR segmentectomy[tiab] OR VATS[tiab] OR "thoracic surgery"[tiab] OR resection[tiab])'],
+    ['sarcoma', 'Sarcoma mô mềm và GIST',
+      '("Sarcoma"[MeSH] OR "Gastrointestinal Stromal Tumors"[MeSH] OR sarcoma[tiab] OR GIST[tiab]) AND (surgery[tiab] OR resection[tiab] OR surgical[tiab])'],
+    ['da', 'Da và melanoma: cắt rộng, hạch cửa',
+      '("Melanoma"[MeSH] OR "Skin Neoplasms"[MeSH]) AND ("sentinel lymph node"[tiab] OR "sentinel node"[tiab] OR excision[tiab] OR Mohs[tiab] OR surgery[tiab])'],
+    ['phukhoa', 'Ung thư phụ khoa',
+      '("Genital Neoplasms, Female"[MeSH] OR ovarian cancer[tiab] OR cervical cancer[tiab] OR endometrial cancer[tiab]) AND (surgery[tiab] OR hysterectomy[tiab] OR cytoreduct*[tiab] OR "sentinel lymph node"[tiab])'],
+    ['tietnieu', 'Ung thư tiết niệu (tiền liệt tuyến, thận, bàng quang)',
+      '("Urologic Neoplasms"[MeSH] OR "Prostatic Neoplasms"[MeSH]) AND (prostatectomy[tiab] OR nephrectomy[tiab] OR cystectomy[tiab] OR surgery[tiab])']
+  ]);
+
+  grp(TOPIC_GROUPS[1], [
+    ['eras', 'ERAS và chăm sóc quanh mổ ung thư',
+      '("Enhanced Recovery After Surgery"[tiab] OR ERAS[tiab] OR "Perioperative Care"[MeSH]) AND (cancer[tiab] OR oncolog*[tiab])'],
+    ['congnghe', 'Robot, ICG huỳnh quang và công nghệ mới',
+      '("Robotic Surgical Procedures"[MeSH] OR "indocyanine green"[tiab] OR "fluorescence-guided"[tiab] OR "fluorescence guided"[tiab] OR "augmented reality"[tiab] OR "3D laparoscopy"[tiab]) AND ' + CANCER],
+    ['bienchung', 'Rò miệng nối, rò tụy và biến chứng sau mổ',
+      '("Anastomotic Leak"[MeSH] OR "anastomotic leak"[tiab] OR "anastomotic leakage"[tiab] OR "Pancreatic Fistula"[MeSH] OR "postoperative complications"[ti] OR "failure to rescue"[tiab]) AND (cancer[tiab] OR resection[tiab] OR gastrectomy[tiab] OR colectomy[tiab] OR pancreatoduodenectomy[tiab])'],
+    ['ssi', 'Nhiễm khuẩn vết mổ và kháng sinh dự phòng',
+      '("Surgical Wound Infection"[MeSH] OR "surgical site infection"[tiab] OR "Antibiotic Prophylaxis"[MeSH]) AND (abdominal[tiab] OR colorectal[tiab] OR gastrointestinal[tiab] OR cancer[tiab] OR oncolog*[tiab])'],
+    ['vte', 'Huyết khối tĩnh mạch (VTE) quanh mổ ung thư',
+      '("Venous Thromboembolism"[MeSH] OR "venous thromboembolism"[tiab] OR thromboprophylaxis[tiab]) AND (cancer[tiab] OR oncolog*[tiab]) AND (surgery[tiab] OR postoperative[tiab] OR perioperative[tiab])'],
+    ['prehab', 'Tiền phục hồi, dinh dưỡng và sarcopenia',
+      '(prehabilitation[tiab] OR "Nutritional Support"[MeSH] OR immunonutrition[tiab] OR "Sarcopenia"[MeSH] OR sarcopenia[tiab] OR malnutrition[tiab]) AND (cancer[tiab] OR oncolog*[tiab]) AND (surgery[tiab] OR surgical[tiab] OR perioperative[tiab])'],
+    ['caotuoi', 'Người cao tuổi và frailty trong phẫu thuật ung thư',
+      '(frailty[tiab] OR "geriatric assessment"[tiab] OR "older adults"[tiab] OR elderly[tiab] OR octogenarian*[tiab]) AND (cancer[tiab] OR oncolog*[tiab]) AND (surgery[tiab] OR resection[tiab])'],
+    ['gayme', 'Gây mê, giảm đau quanh mổ và tiết kiệm opioid',
+      '("regional anesthesia"[tiab] OR "opioid-sparing"[tiab] OR "opioid-free"[tiab] OR "transversus abdominis plane"[tiab] OR "erector spinae"[tiab] OR "Analgesia"[MeSH]) AND (cancer[tiab] OR oncolog*[tiab]) AND (surgery[tiab] OR postoperative[tiab])'],
+    ['capcuu', 'Cấp cứu ung thư: tắc ruột, thủng, chảy máu',
+      '(emergency[tiab] OR urgent[tiab] OR "Intestinal Obstruction"[MeSH]) AND (obstruct*[tiab] OR perforat*[tiab] OR bleeding[tiab] OR stent*[tiab]) AND ("Colorectal Neoplasms"[MeSH] OR "Stomach Neoplasms"[MeSH] OR malignant[tiab])']
+  ]);
+
+  grp(TOPIC_GROUPS[2], [
+    ['tanhotro', 'Điều trị toàn thân quanh mổ (tân hỗ trợ, miễn dịch)',
+      '(neoadjuvant[tiab] OR "perioperative chemotherapy"[tiab] OR immunotherapy[tiab]) AND (resectable[tiab] OR surgery[tiab]) AND "Neoplasms"[MeSH]'],
+    ['tienxa', 'Ung thư tiến xa: điều trị đích và miễn dịch',
+      '("Immune Checkpoint Inhibitors"[MeSH] OR "immune checkpoint"[tiab] OR "Molecular Targeted Therapy"[MeSH] OR "targeted therapy"[tiab] OR "antibody-drug conjugate"[tiab]) AND (' + DIGEST + ' OR "Breast Neoplasms"[MeSH]) AND (metastatic[tiab] OR advanced[tiab] OR unresectable[tiab])'],
+    ['xatri', 'Xạ trị kết hợp phẫu thuật và SBRT',
+      '("Radiotherapy"[MeSH] OR chemoradiotherapy[tiab] OR chemoradiation[tiab] OR SBRT[tiab] OR "stereotactic body radiotherapy"[tiab]) AND (' + DIGEST + ' OR "Breast Neoplasms"[MeSH]) AND (surgery[tiab] OR resection[tiab] OR preoperative[tiab] OR postoperative[tiab])'],
+    ['ctdna', 'ctDNA và sinh thiết lỏng',
+      '("Circulating Tumor DNA"[MeSH] OR ctDNA[tiab] OR "liquid biopsy"[tiab]) AND (colorectal[tiab] OR gastric[tiab] OR surgery[tiab] OR resection[tiab])'],
+    ['biomarker', 'Dấu ấn phân tử và NGS (MSI/dMMR, HER2, KRAS)',
+      '("Microsatellite Instability"[MeSH] OR dMMR[tiab] OR MSI-H[tiab] OR "mismatch repair"[tiab] OR "next-generation sequencing"[tiab] OR "High-Throughput Nucleotide Sequencing"[MeSH] OR HER2[tiab] OR KRAS[tiab] OR Claudin[tiab]) AND ' + DIGEST],
+    ['ditruyen', 'Ung thư di truyền: Lynch, BRCA và tư vấn di truyền',
+      '("Colorectal Neoplasms, Hereditary Nonpolyposis"[MeSH] OR "Lynch syndrome"[tiab] OR "Genes, BRCA1"[MeSH] OR "Genes, BRCA2"[MeSH] OR BRCA[tiab] OR "hereditary cancer"[tiab] OR "germline testing"[tiab]) AND ' + CANCER]
+  ]);
+
+  grp(TOPIC_GROUPS[3], [
+    ['tsdtt', 'Tầm soát đại-trực tràng: FIT, nội soi, xét nghiệm máu',
+      '("Colorectal Neoplasms"[MeSH] OR colorectal cancer[tiab]) AND ("Early Detection of Cancer"[MeSH] OR screening[tiab]) AND (FIT[tiab] OR "fecal immunochemical"[tiab] OR colonoscopy[tiab] OR "stool DNA"[tiab] OR "blood-based"[tiab])'],
+    ['tsdd', 'Dạ dày: H. pylori, phát hiện sớm và ESD',
+      '("Stomach Neoplasms"[MeSH] OR gastric cancer[tiab]) AND ("Helicobacter pylori"[MeSH] OR "Helicobacter pylori"[tiab] OR "early gastric cancer"[tiab] OR screening[tiab] OR "endoscopic submucosal dissection"[tiab])'],
+    ['tsgan', 'Gan: HBV, HCV và giám sát ung thư gan',
+      '("Carcinoma, Hepatocellular"[MeSH] OR hepatocellular carcinoma[tiab]) AND (surveillance[tiab] OR screening[tiab] OR "early detection"[tiab] OR AFP[tiab] OR PIVKA[tiab] OR GALAD[tiab] OR "Hepatitis B"[MeSH])'],
+    ['tsvu', 'Vú và cổ tử cung: nhũ ảnh, HPV',
+      '("Breast Neoplasms"[MeSH] AND (mammograph*[tiab] OR screening[tiab])) OR ("Uterine Cervical Neoplasms"[MeSH] AND (HPV[tiab] OR screening[tiab] OR "Papillomavirus Vaccines"[MeSH]))'],
+    ['tsphoi', 'Phổi: tầm soát bằng CT liều thấp',
+      '("Lung Neoplasms"[MeSH] OR lung cancer[tiab]) AND ("low-dose CT"[tiab] OR "low-dose computed tomography"[tiab] OR LDCT[tiab]) AND screening[tiab]'],
+    ['mced', 'Xét nghiệm phát hiện đa ung thư (MCED)',
+      '"multi-cancer early detection"[tiab] OR "multicancer early detection"[tiab] OR MCED[tiab] OR "multi-cancer detection"[tiab] OR "cell-free DNA methylation"[tiab]'],
+    ['ai', 'Trí tuệ nhân tạo trong chẩn đoán và phẫu thuật ung thư',
+      '("Artificial Intelligence"[MeSH] OR "deep learning"[tiab] OR "machine learning"[tiab] OR "large language model"[tiab] OR "large language models"[tiab]) AND (cancer[tiab] OR oncolog*[tiab]) AND (surg*[tiab] OR endoscop*[tiab] OR patholog*[tiab] OR radiolog*[tiab])']
+  ]);
+
+  grp(TOPIC_GROUPS[4], [
+    ['giamnhe', 'Chăm sóc giảm nhẹ và kiểm soát đau ung thư',
+      '("Palliative Care"[MeSH] OR "Cancer Pain"[MeSH] OR "palliative surgery"[tiab] OR "malignant bowel obstruction"[tiab]) AND (cancer[tiab] OR neoplasm*[tiab])'],
+    ['theodoi', 'Theo dõi sau điều trị và người sống sau ung thư',
+      '("Cancer Survivors"[MeSH] OR survivorship[tiab] OR "follow-up"[ti] OR surveillance[ti] OR recurrence[ti]) AND (' + DIGEST + ' OR "Breast Neoplasms"[MeSH]) AND (surgery[tiab] OR resection[tiab] OR curative[tiab])'],
+    ['qol', 'Chất lượng sống và kết cục do người bệnh báo cáo (PROMs)',
+      '("Quality of Life"[MeSH] OR "patient-reported outcome"[tiab] OR "patient-reported outcomes"[tiab] OR PROMs[tiab]) AND (cancer[tiab] OR oncolog*[tiab]) AND (surgery[tiab] OR surgical[tiab])']
+  ]);
+
+  grp(TOPIC_GROUPS[5], [
+    ['sanchau', 'Sàn chậu: sa tạng chậu, tiểu không tự chủ, đại tiện tắc nghẽn',
+      '"Pelvic Floor Disorders"[MeSH] OR "Pelvic Organ Prolapse"[MeSH] OR "Rectal Prolapse"[MeSH] OR "pelvic floor"[tiab] OR "pelvic organ prolapse"[tiab] OR "obstructed defecation"[tiab] OR "fecal incontinence"[tiab] OR "stress urinary incontinence"[tiab] OR sacrocolpopexy[tiab] OR rectopexy[tiab]'],
+    ['hauMon', 'Hậu môn lành tính: trĩ, rò, nứt, áp xe',
+      '"Hemorrhoids"[MeSH] OR "Rectal Fistula"[MeSH] OR "Fissure in Ano"[MeSH] OR hemorrhoid*[tiab] OR haemorrhoid*[tiab] OR "anal fistula"[tiab] OR "fistula-in-ano"[tiab] OR "anal fissure"[tiab] OR "perianal abscess"[tiab] OR "pilonidal"[tiab]'],
+    ['tnLanh', 'Tiết niệu lành tính: sỏi, tăng sinh tuyến tiền liệt, nhiễm khuẩn',
+      '"Urolithiasis"[MeSH] OR "Kidney Calculi"[MeSH] OR "Prostatic Hyperplasia"[MeSH] OR "Lower Urinary Tract Symptoms"[MeSH] OR "Urinary Tract Infections"[MeSH] OR "overactive bladder"[tiab] OR ureteroscopy[tiab] OR "percutaneous nephrolithotomy"[tiab]']
+  ]);
+
+  grp(TOPIC_GROUPS[6], [
+    ['longnguc', 'Phẫu thuật lồng ngực: tràn khí, mủ màng phổi, trung thất',
+      '("Thoracic Surgical Procedures"[MeSH] OR "Thoracic Surgery, Video-Assisted"[MeSH] OR pneumothorax[tiab] OR empyema[tiab] OR "pleural effusion"[tiab] OR mediastin*[tiab] OR hyperhidrosis[tiab] OR "pectus excavatum"[tiab]) NOT "Lung Neoplasms"[MeSH]'],
+    ['chanthuongnguc', 'Chấn thương ngực',
+      '"Thoracic Injuries"[MeSH] OR "Rib Fractures"[MeSH] OR "chest trauma"[tiab] OR "thoracic trauma"[tiab] OR "rib fixation"[tiab] OR hemothorax[tiab] OR "flail chest"[tiab]']
+  ]);
+
+  grp(TOPIC_GROUPS[7], [
+    ['dotquy', 'Đột quỵ: dự phòng, tiêu sợi huyết, lấy huyết khối',
+      '("Stroke"[MeSH] OR stroke[ti] OR "Ischemic Attack, Transient"[MeSH]) AND (prevention[tiab] OR thrombectomy[tiab] OR thrombolysis[tiab] OR tenecteplase[tiab] OR alteplase[tiab] OR "atrial fibrillation"[tiab] OR "carotid"[tiab] OR "risk factor"[tiab])'],
+    ['nhanthuc', 'Sa sút trí tuệ, suy giảm nhận thức và bệnh mạch máu não nhỏ',
+      '"Dementia"[MeSH] OR "Cognitive Dysfunction"[MeSH] OR "Cerebral Small Vessel Diseases"[MeSH] OR "mild cognitive impairment"[tiab] OR "white matter hyperintensit*"[tiab] OR "brain age"[tiab]'],
+    ['thankinhkhac', 'Parkinson, động kinh, đau đầu và bệnh thần kinh thường gặp',
+      '"Parkinson Disease"[MeSH] OR "Epilepsy"[MeSH] OR "Migraine Disorders"[MeSH] OR "Headache Disorders"[MeSH] OR "Peripheral Nervous System Diseases"[MeSH] OR "Vertigo"[MeSH]']
+  ]);
+
+  grp(TOPIC_GROUPS[8], [
+    ['thaiNguyCo', 'Thai kỳ nguy cơ cao: tiền sản giật, đái tháo đường thai kỳ, sinh non',
+      '"Pre-Eclampsia"[MeSH] OR "Diabetes, Gestational"[MeSH] OR "Premature Birth"[MeSH] OR "Fetal Growth Retardation"[MeSH] OR preeclampsia[tiab] OR "pre-eclampsia"[tiab] OR "gestational diabetes"[tiab] OR "preterm birth"[tiab]'],
+    ['chuyenda', 'Chuyển dạ, mổ lấy thai và băng huyết sau sinh',
+      '"Cesarean Section"[MeSH] OR "Postpartum Hemorrhage"[MeSH] OR "Labor, Induced"[MeSH] OR "cesarean"[tiab] OR "caesarean"[tiab] OR "postpartum haemorrhage"[tiab] OR "postpartum hemorrhage"[tiab] OR "induction of labour"[tiab] OR "induction of labor"[tiab] OR "placenta accreta"[tiab]'],
+    ['truocsinh', 'Sàng lọc trước sinh: NIPT, siêu âm, di truyền',
+      '"Prenatal Diagnosis"[MeSH] OR "Noninvasive Prenatal Testing"[MeSH] OR NIPT[tiab] OR "cell-free fetal DNA"[tiab] OR "prenatal screening"[tiab] OR "first-trimester screening"[tiab]'],
+    ['phukhoaLanh', 'Phụ khoa lành tính: u xơ, lạc nội mạc, phẫu thuật nội soi',
+      '"Leiomyoma"[MeSH] OR "Endometriosis"[MeSH] OR "Adenomyosis"[MeSH] OR "Polycystic Ovary Syndrome"[MeSH] OR "Gynecologic Surgical Procedures"[MeSH] OR "uterine fibroid*"[tiab] OR endometriosis[tiab]'],
+    ['sinhsan', 'Hỗ trợ sinh sản và vô sinh',
+      '"Infertility"[MeSH] OR "Reproductive Techniques, Assisted"[MeSH] OR "Fertilization in Vitro"[MeSH] OR "in vitro fertilization"[tiab] OR IVF[tiab] OR "embryo transfer"[tiab]']
+  ]);
+
+  grp(TOPIC_GROUPS[9], [
+    ['vn', 'Ung thư tại Việt Nam',
+      '"Neoplasms"[MeSH] AND (Vietnam[ad] OR Vietnam[tiab])'],
+    ['vnngoai', 'Ngoại khoa tại Việt Nam và Đông Nam Á',
+      '(Vietnam[ad] OR Vietnam[tiab] OR "Viet Nam"[tiab] OR "Southeast Asia"[tiab] OR Thailand[tiab] OR Malaysia[tiab] OR Indonesia[tiab] OR Philippines[tiab]) AND ("Surgical Procedures, Operative"[MeSH] OR surgery[tiab] OR surgical[tiab])'],
+    ['antoan', 'An toàn người bệnh và chất lượng ngoại khoa',
+      '("Patient Safety"[MeSH] OR "Quality Improvement"[MeSH] OR "surgical safety checklist"[tiab] OR "textbook outcome"[tiab] OR "failure to rescue"[tiab]) AND (surgery[tiab] OR surgical[tiab])'],
+    ['kinhte', 'Kinh tế y tế: chi phí và chi phí-hiệu quả',
+      '("Costs and Cost Analysis"[MeSH] OR "cost-effectiveness"[tiab] OR "cost analysis"[tiab] OR "hospital costs"[tiab] OR reimbursement[tiab]) AND (cancer[tiab] OR oncolog*[tiab]) AND (surgery[tiab] OR surgical[tiab])'],
+    ['quanly', 'Quản lý bệnh viện, nhân lực và y tế số',
+      '("Hospital Administration"[MeSH] OR "Health Workforce"[MeSH] OR "Telemedicine"[MeSH] OR burnout[tiab] OR "value-based"[tiab] OR "digital health"[tiab]) AND (surgery[tiab] OR surgeon*[tiab] OR oncolog*[tiab] OR hospital*[tiab])'],
+    ['daotao', 'Đào tạo phẫu thuật và learning curve',
+      '("learning curve"[tiab] OR "surgical training"[tiab] OR "surgical education"[tiab] OR "Simulation Training"[MeSH]) AND (laparoscop*[tiab] OR robot*[tiab] OR surgical[tiab] OR surgery[tiab])']
+  ]);
 
   var DEFAULT_GUIDES = [
     { id: 'nccn', group: 'Ung thư học', name: 'NCCN Guidelines', url: 'https://www.nccn.org/guidelines/category_1', note: 'Phổ biến nhất tại Việt Nam; đối chiếu số phiên bản theo từng cơ quan' },
@@ -257,9 +415,29 @@
     { id: 'vbpl', group: 'Việt Nam', name: 'CSDL quốc gia về pháp luật', url: 'https://vbpl.vn', note: 'Tra thông tư, nghị định mới nhất, gồm văn bản của Bộ Y tế' },
     { id: 'kcb', group: 'Việt Nam', name: 'Cục Quản lý Khám, chữa bệnh', url: 'https://kcb.vn', note: 'Cấp phép, khám chữa bệnh' },
     { id: 'bhxh', group: 'Việt Nam', name: 'Bảo hiểm xã hội Việt Nam', url: 'https://baohiemxahoi.gov.vn', note: 'BHYT, thanh toán' },
-    { id: 'dav', group: 'Việt Nam', name: 'Cục Quản lý Dược', url: 'https://dav.gov.vn', note: 'Đăng ký thuốc, cảnh báo thuốc' }
+    { id: 'dav', group: 'Việt Nam', name: 'Cục Quản lý Dược', url: 'https://dav.gov.vn', note: 'Đăng ký thuốc, cảnh báo thuốc' },
+
+    { id: 'who', group: 'WHO và nguồn toàn cầu', name: 'WHO Guidelines', url: 'https://www.who.int/publications/who-guidelines', note: 'Khuyến cáo chính thức của WHO' },
+    { id: 'whoiris', group: 'WHO và nguồn toàn cầu', name: 'WHO IRIS', url: 'https://iris.who.int', note: 'Kho toàn văn tài liệu, báo cáo của WHO' },
+    { id: 'hinari', group: 'WHO và nguồn toàn cầu', name: 'Research4Life (HINARI)', url: 'https://portal.research4life.org', note: 'Đọc toàn văn tạp chí miễn phí/giá thấp cho Việt Nam qua cơ quan đăng ký' },
+    { id: 'iarc', group: 'WHO và nguồn toàn cầu', name: 'IARC Global Cancer Observatory', url: 'https://gco.iarc.who.int', note: 'Số liệu GLOBOCAN, dịch tễ ung thư theo quốc gia' },
+    { id: 'europepmc', group: 'WHO và nguồn toàn cầu', name: 'Europe PMC', url: 'https://europepmc.org', note: 'Gồm PubMed, toàn văn mở và preprint' },
+    { id: 'medrxiv', group: 'WHO và nguồn toàn cầu', name: 'medRxiv', url: 'https://www.medrxiv.org', note: 'Bản thảo trước bình duyệt, cần đọc thận trọng' },
+    { id: 'tripdb', group: 'WHO và nguồn toàn cầu', name: 'Trip Database', url: 'https://www.tripdatabase.com', note: 'Tìm guideline và chứng cứ từ nhiều quốc gia một lần' },
+
+    { id: 'ics', group: 'Chuyên khoa khác', name: 'ICS và IUGA', url: 'https://www.ics.org', note: 'Sàn chậu, tiểu không tự chủ (xem thêm iuga.org)' },
+    { id: 'eau', group: 'Chuyên khoa khác', name: 'EAU Guidelines', url: 'https://uroweb.org/guidelines', note: 'Tiết niệu châu Âu, cập nhật hằng năm' },
+    { id: 'aua', group: 'Chuyên khoa khác', name: 'AUA Guidelines', url: 'https://www.auanet.org/guidelines-and-quality/guidelines', note: 'Tiết niệu Hoa Kỳ' },
+    { id: 'sts', group: 'Chuyên khoa khác', name: 'STS và ESTS', url: 'https://www.sts.org', note: 'Phẫu thuật lồng ngực (xem thêm ests.org)' },
+    { id: 'aha', group: 'Chuyên khoa khác', name: 'AHA/ASA Guidelines', url: 'https://professional.heart.org/en/guidelines-and-statements', note: 'Đột quỵ, tim mạch' },
+    { id: 'eso', group: 'Chuyên khoa khác', name: 'European Stroke Organisation', url: 'https://eso-stroke.org/guidelines/eso-guideline-directory/', note: 'Guideline đột quỵ châu Âu' },
+    { id: 'aan', group: 'Chuyên khoa khác', name: 'AAN Guidelines', url: 'https://www.aan.com/practice/guidelines', note: 'Thần kinh học' },
+    { id: 'acog', group: 'Chuyên khoa khác', name: 'ACOG', url: 'https://www.acog.org/clinical', note: 'Sản phụ khoa Hoa Kỳ' },
+    { id: 'rcog', group: 'Chuyên khoa khác', name: 'RCOG Green-top Guidelines', url: 'https://www.rcog.org.uk/guidance/', note: 'Sản phụ khoa Anh' },
+    { id: 'figo', group: 'Chuyên khoa khác', name: 'FIGO', url: 'https://www.figo.org', note: 'Sản phụ khoa quốc tế, phù hợp nước thu nhập trung bình' }
   ];
-  var GROUP_ORDER = ['Ung thư học', 'Ngoại khoa', 'Chứng cứ tổng hợp', 'Việt Nam', 'Của tôi'];
+  var ORIGINAL_GUIDE_IDS = ['nccn', 'asco', 'esmo', 'ascrs', 'sages', 'eras', 'ihpba', 'sso', 'acs', 'acpgbi', 'wses', 'nice', 'cochrane', 'ctgov', 'moh', 'vbpl', 'kcb', 'bhxh', 'dav'];
+  var GROUP_ORDER = ['Ung thư học', 'Ngoại khoa', 'Chuyên khoa khác', 'WHO và nguồn toàn cầu', 'Chứng cứ tổng hợp', 'Việt Nam', 'Của tôi'];
 
   /* Bộ sưu tập Mini Medical Hub gốc */
   var HUB = [
@@ -305,8 +483,23 @@
     'Guideline': 'Guideline'
   };
 
-  var topics = store.get('ymvan.topics.v1', null) || clone(DEFAULT_TOPICS);
-  var guides = store.get('ymvan.guides.v1', null) || clone(DEFAULT_GUIDES);
+  var savedTopics = store.get('ymvan.topics.v1', null);
+  var topics = savedTopics || clone(DEFAULT_TOPICS);
+  var openGroups = store.get('ymvan.topicGroupsOpen.v1', null) || {};
+  if (!Object.keys(openGroups).length) openGroups[TOPIC_GROUPS[0]] = true;
+  var savedGuides = store.get('ymvan.guides.v1', null);
+  var guides = savedGuides || clone(DEFAULT_GUIDES);
+  /* Thêm nguồn mặc định mới vào danh sách đã lưu (không thêm lại nguồn đã xóa) */
+  (function migrateNewGuides() {
+    var seen = store.get('ymvan.guidesSeen.v1', null) || (savedGuides ? ORIGINAL_GUIDE_IDS.slice() : []);
+    var have = {}, added = false;
+    guides.forEach(function (g) { have[g.id] = true; });
+    DEFAULT_GUIDES.forEach(function (d) {
+      if (seen.indexOf(d.id) < 0 && !have[d.id]) { guides.push(clone(d)); added = true; }
+    });
+    store.set('ymvan.guidesSeen.v1', DEFAULT_GUIDES.map(function (d) { return d.id; }));
+    if (added && savedGuides) store.set('ymvan.guides.v1', guides);
+  })();
   var windowDays = store.get('ymvan.window.v1', 30);
 
   /* Sửa địa chỉ cũ đã hỏng trong danh sách nguồn đã lưu sẵn trên trình duyệt */
@@ -326,6 +519,32 @@
     });
     if (changed) saveGuides();
   })();
+
+  /* Bổ sung chủ đề mặc định mới vào danh sách đã lưu (không thêm lại chủ đề người dùng đã xóa) */
+  (function migrateTopics() {
+    var seen = store.get('ymvan.topicsSeen.v1', null) || (savedTopics ? ORIGINAL_TOPIC_IDS.slice() : []);
+    var byId = {}, have = {}, changed = false;
+    DEFAULT_TOPICS.forEach(function (d) { byId[d.id] = d; });
+    topics.forEach(function (t) {
+      have[t.id] = true;
+      if (!t.group) { t.group = byId[t.id] ? byId[t.id].group : MY_GROUP; changed = true; }
+    });
+    DEFAULT_TOPICS.forEach(function (d) {
+      if (seen.indexOf(d.id) < 0 && !have[d.id]) { topics.push(clone(d)); changed = true; }
+    });
+    store.set('ymvan.topicsSeen.v1', DEFAULT_TOPICS.map(function (d) { return d.id; }).concat(
+      seen.filter(function (x) { return !byId[x]; })));
+    if (changed && savedTopics) saveTopics();
+  })();
+
+  function groupOf(t) { return t.group || MY_GROUP; }
+  function groupList() {
+    var out = TOPIC_GROUPS.slice();
+    topics.forEach(function (t) { var g = groupOf(t); if (out.indexOf(g) < 0 && g !== MY_GROUP) out.push(g); });
+    out.push(MY_GROUP);
+    return out;
+  }
+  function saveOpen() { store.set('ymvan.topicGroupsOpen.v1', openGroups); }
 
   var editingTopic = null;
   var addingGuide = false;
@@ -537,6 +756,7 @@
   function ensureCounts() {
     var from = daysAgo(windowDays);
     topics.forEach(function (t) {
+      if (!openGroups[groupOf(t)] && editingTopic !== t.id) return;
       fetchCount(t, from);
       if (t.viewed) fetchCount(t, fromIso(t.viewed));
     });
@@ -586,12 +806,16 @@
     var name = h('input', { class: 'field', type: 'text', id: 'ed-name', value: t.name });
     var query = h('textarea', { class: 'field', rows: '4', id: 'ed-query' });
     query.value = t.query;
+    var group = h('input', { class: 'field', type: 'text', id: 'ed-group', list: 'ed-groups', value: t.group || MY_GROUP });
+    var groupOpts = h('datalist', { id: 'ed-groups' });
+    groupList().forEach(function (g) { groupOpts.append(h('option', { value: g })); });
     var err = h('p', { class: 'row-meta', role: 'alert' });
     var save = h('button', { class: 'btn primary', type: 'button', onclick: function () {
-      var n = name.value.trim(), q = query.value.trim();
+      var n = name.value.trim(), q = query.value.trim(), g = group.value.trim() || MY_GROUP;
       if (!n || !q) { err.textContent = 'Cần nhập cả tên chủ đề và truy vấn PubMed.'; return; }
-      if (isNew) topics.push({ id: uid('t'), name: n, query: q });
-      else { t.name = n; t.query = q; delete quick[t.id]; }
+      if (isNew) topics.push({ id: uid('t'), group: g, name: n, query: q });
+      else { t.name = n; t.query = q; t.group = g; delete quick[t.id]; }
+      openGroups[g] = true; saveOpen();
       saveTopics(); editingTopic = null; renderTopics(); renderAlertTopics();
     } }, 'Lưu');
     var cancel = h('button', { class: 'btn', type: 'button', onclick: function () { editingTopic = null; renderTopics(); } }, 'Hủy');
@@ -603,6 +827,7 @@
     return h('div', { class: 'row' },
       h('div', { class: 'editor' },
         h('label', { class: 'field-label', for: 'ed-name' }, 'Tên chủ đề'), name,
+        h('label', { class: 'field-label', for: 'ed-group' }, 'Nhóm (chọn có sẵn hoặc gõ tên nhóm mới)'), group, groupOpts,
         h('label', { class: 'field-label', for: 'ed-query' }, 'Truy vấn PubMed (không cần thêm điều kiện ngày)'), query,
         err,
         h('div', { class: 'editor-actions' }, actions)));
@@ -625,7 +850,32 @@
     var box = document.getElementById('topics');
     box.textContent = '';
     var from = daysAgo(windowDays);
-    topics.forEach(function (t) {
+    groupList().forEach(function (g) {
+      var list = topics.filter(function (t) { return groupOf(t) === g; });
+      if (!list.length) return;
+      var open = !!openGroups[g];
+      var total = 0, known = 0, fresh = 0;
+      list.forEach(function (t) {
+        var c = countOf(t, from);
+        if (c !== null) { total += c; known++; }
+        if (t.viewed) fresh += countOf(t, fromIso(t.viewed)) || 0;
+      });
+      box.append(h('button', {
+        class: 'grp', type: 'button', 'aria-expanded': open ? 'true' : 'false',
+        onclick: function () { openGroups[g] = !open; saveOpen(); renderTopics(); }
+      },
+        h('span', { class: 'grp-chev', 'aria-hidden': 'true' }, open ? '▾' : '▸'),
+        h('span', { class: 'grp-name' }, g),
+        h('span', { class: 'grp-meta' }, list.length + ' chủ đề'),
+        (known && known === list.length) ? h('span', { class: 'pill' }, total + ' bài') : null,
+        fresh ? h('span', { class: 'pill new' }, fresh + ' mới') : null));
+      if (open) list.forEach(function (t) { topicRow(t, from, box); });
+    });
+    if (editingTopic === 'new') box.append(topicEditor({ name: '', query: '', group: MY_GROUP }, true));
+    renderTopicsFoot();
+  }
+
+  function topicRow(t, from, box) {
       if (editingTopic === t.id) { box.append(topicEditor(t, false)); return; }
       function mark() { setTimeout(function () { t.viewed = iso(new Date()); saveTopics(); renderTopics(); }, 0); }
       function link(label, url, primary) {
@@ -655,13 +905,19 @@
           h('p', { class: 'row-meta' }, meta)),
         h('div', { class: 'row-actions' }, actions),
         quickPanel(t)));
-    });
-    if (editingTopic === 'new') box.append(topicEditor({ name: '', query: '' }, true));
+  }
 
+  function renderTopicsFoot() {
+    var allOpen = groupList().every(function (g) { return openGroups[g] || !topics.some(function (t) { return groupOf(t) === g; }); });
     var foot = document.getElementById('topics-foot');
     foot.textContent = '';
     foot.append(
       h('button', { class: 'btn', type: 'button', onclick: function () { editingTopic = 'new'; renderTopics(); var e = document.getElementById('ed-name'); if (e) e.focus(); } }, 'Thêm chủ đề'),
+      h('button', { class: 'btn', type: 'button', onclick: function () {
+        groupList().forEach(function (g) { openGroups[g] = !allOpen; });
+        if (allOpen) openGroups[TOPIC_GROUPS[0]] = true;
+        saveOpen(); renderTopics();
+      } }, allOpen ? 'Thu gọn các nhóm' : 'Mở tất cả nhóm'),
       twoStep('Khôi phục chủ đề mặc định', function () { topics = clone(DEFAULT_TOPICS); saveTopics(); quick = {}; editingTopic = null; renderTopics(); renderAlertTopics(); })
     );
   }
@@ -751,7 +1007,9 @@
   function renderAlertTopics() {
     var box = document.getElementById('alert-topics');
     box.textContent = '';
-    topics.forEach(function (t) {
+    var lastGroup = null;
+    groupList().forEach(function (g) { topics.filter(function (t) { return groupOf(t) === g; }).forEach(function (t) {
+      if (g !== lastGroup) { lastGroup = g; box.append(h('p', { class: 'alert-group' }, g)); }
       var copy = h('button', { class: 'btn', type: 'button' }, 'Sao chép truy vấn');
       copy.addEventListener('click', function () { copyText(t.query, copy); });
       box.append(h('div', { class: 'row' },
@@ -761,7 +1019,7 @@
         h('div', { class: 'row-actions' },
           copy,
           h('a', { class: 'btn primary', href: pubmed(t.query, null), target: '_blank', rel: 'noopener noreferrer' }, 'Mở PubMed để đặt cảnh báo'))));
-    });
+    }); });
   }
 
   renderWindow();
